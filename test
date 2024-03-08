@@ -1,4 +1,4 @@
-help
+help -v
 cat test
 stdout 'help'
 exec caat
