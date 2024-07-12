@@ -2,4 +2,5 @@ help -v
 cat test
 stdout 'help'
 exec caat
+execv showpic ' 	-grayscale  	 -help  	 ' &
 wait
