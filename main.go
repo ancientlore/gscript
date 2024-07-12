@@ -38,11 +38,6 @@ func main() {
 		reader := bufio.NewReader(f)
 		var logf bytes.Buffer
 		err = engine.Execute(state, scr, reader, &logf)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			// fmt.Fprintln(os.Stderr, logf.String())
-			return
-		}
 		if *printLog {
 			fmt.Println(logf.String())
 		}
@@ -51,6 +46,10 @@ func main() {
 		}
 		if *printErr {
 			fmt.Fprintln(os.Stderr, state.Stderr())
+		}
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return
 		}
 	}
 }
