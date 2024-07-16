@@ -4,3 +4,5 @@ stdout 'help'
 exec caat
 execv showpic ' 	-grayscale  	 -help  	 ' &
 wait
+[exists:test] echo 'File ''test'' exists'
+[exists:testx] echo 'File ''testx'' exists'

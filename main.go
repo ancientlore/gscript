@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -46,6 +47,7 @@ func runScript(scr string) (stdout string, stderr string, scrlog string, err err
 	// engine.ListCmds(os.Stdout, true)
 	// engine.ListConds(os.Stdout, nil)
 	engine.Cmds["execv"] = execv(engine.Cmds["exec"])
+	engine.Conds["exists"] = exists()
 	var state *script.State
 	state, err = script.NewState(context.Background(), ".", os.Environ())
 	if err != nil {
@@ -93,5 +95,17 @@ func execv(execCmd script.Cmd) script.Cmd {
 				}
 			}
 			return execCmd.Run(s, newArgs...)
+		})
+}
+
+func exists() script.Cond {
+	return script.PrefixCondition(
+		"<suffix> is a file that exists",
+		func(_ *script.State, suffix string) (bool, error) {
+			fi, err := os.Stat(suffix)
+			if errors.Is(err, os.ErrNotExist) {
+				err = nil
+			}
+			return fi != nil, err
 		})
 }
