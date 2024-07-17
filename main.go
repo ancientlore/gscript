@@ -48,6 +48,7 @@ func runScript(scr string) (stdout string, stderr string, scrlog string, err err
 	// engine.ListConds(os.Stdout, nil)
 	engine.Cmds["execv"] = execv(engine.Cmds["exec"])
 	engine.Conds["exists"] = exists()
+	engine.Conds["set"] = set()
 	var state *script.State
 	state, err = script.NewState(context.Background(), ".", os.Environ())
 	if err != nil {
@@ -107,5 +108,14 @@ func exists() script.Cond {
 				err = nil
 			}
 			return fi != nil, err
+		})
+}
+
+func set() script.Cond {
+	return script.PrefixCondition(
+		"<suffix> is an environment variable that is set and non-blank",
+		func(s *script.State, suffix string) (bool, error) {
+			e, _ := s.LookupEnv(suffix)
+			return strings.TrimSpace(e) != "", nil
 		})
 }

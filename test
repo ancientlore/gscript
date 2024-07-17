@@ -6,3 +6,6 @@ execv showpic ' 	-grayscale  	 -help  	 ' &
 wait
 [exists:test] echo 'File ''test'' exists'
 [exists:testx] echo 'File ''testx'' exists'
+[set:PATH] echo 'Path set'
+[set:foo] echo 'foo set'
+[exists:test] [set:PATH] echo Win
