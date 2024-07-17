@@ -7,6 +7,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -18,20 +19,29 @@ func main() {
 		printLog = flag.Bool("log", false, "Show output log")
 		printOut = flag.Bool("stdout", false, "Print stdout of last command")
 		printErr = flag.Bool("stderr", false, "Print stderr of last command")
+		help     = flag.Bool("help", false, "Show help")
+		cmd      = flag.String("c", "", "Single command to run")
 	)
 
 	flag.Parse()
 
-	for _, scr := range flag.Args() {
-		stdout, stderr, scrlog, err := runScript(scr)
+	if *help {
+		fmt.Fprintln(os.Stderr, "gscript [options] scripts...")
+		fmt.Fprintln(os.Stderr)
+		flag.Usage()
+		os.Exit(0)
+	}
+
+	if *cmd != "" {
+		stdout, stderr, scrlog, err := runScript("command", strings.NewReader(*cmd))
 
 		if *printLog {
 			fmt.Println(scrlog)
 		}
-		if *printOut {
+		if *printOut && len(stdout) > 0 {
 			fmt.Println(stdout)
 		}
-		if *printErr {
+		if *printErr && len(stderr) > 0 {
 			fmt.Fprintln(os.Stderr, stderr)
 		}
 
@@ -40,9 +50,39 @@ func main() {
 			os.Exit(1)
 		}
 	}
+
+	for i, scr := range flag.Args() {
+		stdout, stderr, scrlog, err := runFile(scr)
+
+		if *printLog {
+			fmt.Println(scrlog)
+		}
+		if *printOut && len(stdout) > 0 {
+			fmt.Println(stdout)
+		}
+		if *printErr && len(stderr) > 0 {
+			fmt.Fprintln(os.Stderr, stderr)
+		}
+
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(i + 1)
+		}
+	}
 }
 
-func runScript(scr string) (stdout string, stderr string, scrlog string, err error) {
+func runFile(name string) (stdout string, stderr string, scrlog string, err error) {
+	f, err := os.Open(name)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return "", "", "", err
+	}
+	defer f.Close()
+
+	return runScript(name, f)
+}
+
+func runScript(name string, scriptRdr io.Reader) (stdout string, stderr string, scrlog string, err error) {
 	engine := script.NewEngine()
 	// engine.ListCmds(os.Stdout, true)
 	// engine.ListConds(os.Stdout, nil)
@@ -55,15 +95,9 @@ func runScript(scr string) (stdout string, stderr string, scrlog string, err err
 		fmt.Fprintln(os.Stderr, err)
 		return
 	}
-	f, err := os.Open(scr)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		return
-	}
-	defer f.Close()
-	reader := bufio.NewReader(f)
+	reader := bufio.NewReader(scriptRdr)
 	var logf bytes.Buffer
-	err = engine.Execute(state, scr, reader, &logf)
+	err = engine.Execute(state, name, reader, &logf)
 	scrlog = logf.String()
 	stdout = state.Stdout()
 	stderr = state.Stderr()
