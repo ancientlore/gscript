@@ -146,6 +146,7 @@ func runInteractive(name string, scriptRdr io.Reader) (string, error) {
 	var logf bytes.Buffer
 
 	scanner := bufio.NewScanner(scriptRdr)
+	fmt.Print("> ")
 	for scanner.Scan() {
 		if scanner.Text() == "stop" {
 			break
@@ -170,6 +171,7 @@ func runInteractive(name string, scriptRdr io.Reader) (string, error) {
 				fmt.Fprintln(os.Stderr, stderr)
 			}
 		}
+		fmt.Print("> ")
 	}
 
 	return logf.String(), nil
