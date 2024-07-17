@@ -16,8 +16,8 @@ import (
 func main() {
 	var (
 		printLog = flag.Bool("log", false, "Show output log")
-		printOut = flag.Bool("stdout", false, "Print stdout")
-		printErr = flag.Bool("stderr", false, "Print stderr")
+		printOut = flag.Bool("stdout", false, "Print stdout of last command")
+		printErr = flag.Bool("stderr", false, "Print stderr of last command")
 	)
 
 	flag.Parse()
@@ -46,9 +46,9 @@ func runScript(scr string) (stdout string, stderr string, scrlog string, err err
 	engine := script.NewEngine()
 	// engine.ListCmds(os.Stdout, true)
 	// engine.ListConds(os.Stdout, nil)
-	engine.Cmds["execv"] = execv(engine.Cmds["exec"])
-	engine.Conds["exists"] = exists()
-	engine.Conds["set"] = set()
+	engine.Cmds["execx"] = execExpand("execx", engine.Cmds["exec"])
+	engine.Conds["file"] = fileExists()
+	engine.Conds["env"] = envIsSet()
 	var state *script.State
 	state, err = script.NewState(context.Background(), ".", os.Environ())
 	if err != nil {
@@ -70,14 +70,14 @@ func runScript(scr string) (stdout string, stderr string, scrlog string, err err
 	return
 }
 
-func execv(execCmd script.Cmd) script.Cmd {
+func execExpand(name string, execCmd script.Cmd) script.Cmd {
 	return script.Command(
 		script.CmdUsage{
 			Summary: "run an executable program with arguments",
 			Args:    "program [args...]",
 			Detail: []string{
-				"Note that 'exec' does not terminate the script (unlike Unix shells).",
-				"Arguments will be additionally expanded for command options.",
+				"Note that '" + name + "' does not terminate the script (unlike Unix shells).",
+				"Unlike 'exec', arguments with spaces will be expanded into separate arguments.",
 			},
 			Async: true,
 		},
@@ -99,7 +99,7 @@ func execv(execCmd script.Cmd) script.Cmd {
 		})
 }
 
-func exists() script.Cond {
+func fileExists() script.Cond {
 	return script.PrefixCondition(
 		"<suffix> is a file that exists",
 		func(_ *script.State, suffix string) (bool, error) {
@@ -111,7 +111,7 @@ func exists() script.Cond {
 		})
 }
 
-func set() script.Cond {
+func envIsSet() script.Cond {
 	return script.PrefixCondition(
 		"<suffix> is an environment variable that is set and non-blank",
 		func(s *script.State, suffix string) (bool, error) {

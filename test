@@ -2,10 +2,10 @@ help -v
 cat test
 stdout 'help'
 exec caat
-execv showpic ' 	-grayscale  	 -help  	 ' &
+execx showpic ' 	-grayscale  	 -help  	 ' &
 wait
-[exists:test] echo 'File ''test'' exists'
-[exists:testx] echo 'File ''testx'' exists'
-[set:PATH] echo 'Path set'
-[set:foo] echo 'foo set'
-[exists:test] [set:PATH] echo Win
+[file:test] echo 'File ''test'' exists'
+[file:testx] echo 'File ''testx'' exists'
+[env:PATH] echo 'Path set'
+[env:foo] echo 'foo set'
+[file:test] [env:PATH] echo Win
