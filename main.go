@@ -14,13 +14,17 @@ import (
 	"rsc.io/script"
 )
 
+var (
+	printLog = flag.Bool("log", false, "Show output log")
+	printOut = flag.Bool("stdout", false, "Print stdout of last command")
+	printErr = flag.Bool("stderr", false, "Print stderr of last command")
+)
+
 func main() {
 	var (
-		printLog = flag.Bool("log", false, "Show output log")
-		printOut = flag.Bool("stdout", false, "Print stdout of last command")
-		printErr = flag.Bool("stderr", false, "Print stderr of last command")
-		help     = flag.Bool("help", false, "Show help")
-		cmd      = flag.String("c", "", "Single command to run")
+		help        = flag.Bool("help", false, "Show help")
+		cmd         = flag.String("c", "", "Single command to run")
+		interactive = flag.Bool("i", false, "Interactive mode")
 	)
 
 	flag.Parse()
@@ -32,18 +36,11 @@ func main() {
 		os.Exit(0)
 	}
 
+	// process command argument
 	if *cmd != "" {
 		stdout, stderr, scrlog, err := runScript("command", strings.NewReader(*cmd))
 
-		if *printLog {
-			fmt.Println(scrlog)
-		}
-		if *printOut && len(stdout) > 0 {
-			fmt.Println(stdout)
-		}
-		if *printErr && len(stderr) > 0 {
-			fmt.Fprintln(os.Stderr, stderr)
-		}
+		print(stdout, stderr, scrlog)
 
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
@@ -51,22 +48,60 @@ func main() {
 		}
 	}
 
+	// process scripts
 	for i, scr := range flag.Args() {
 		stdout, stderr, scrlog, err := runFile(scr)
 
-		if *printLog {
-			fmt.Println(scrlog)
-		}
-		if *printOut && len(stdout) > 0 {
-			fmt.Println(stdout)
-		}
-		if *printErr && len(stderr) > 0 {
-			fmt.Fprintln(os.Stderr, stderr)
-		}
+		print(stdout, stderr, scrlog)
 
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(i + 1)
+		}
+	}
+
+	// process stdin if there are not scripts and -c was not provided
+	if flag.NArg() == 0 && *cmd == "" {
+		if *interactive {
+			scrlog, err := runInteractive("stdin", os.Stdin)
+
+			if *printLog {
+				fmt.Println(scrlog)
+			}
+
+			if err != nil {
+				fmt.Fprintln(os.Stderr, err)
+				os.Exit(1)
+			}
+		} else {
+			stdout, stderr, scrlog, err := runScript("stdin", os.Stdin)
+
+			print(stdout, stderr, scrlog)
+
+			if err != nil {
+				fmt.Fprintln(os.Stderr, err)
+				os.Exit(1)
+			}
+		}
+
+	}
+}
+
+func print(stdout, stderr, scrlog string) {
+	if *printLog {
+		fmt.Println(scrlog)
+	} else {
+		if *printOut && len(stdout) > 0 {
+			if *printErr {
+				fmt.Println("[stdout]")
+			}
+			fmt.Println(stdout)
+		}
+		if *printErr && len(stderr) > 0 {
+			if *printOut {
+				fmt.Fprintln(os.Stderr, "[stderr]")
+			}
+			fmt.Fprintln(os.Stderr, stderr)
 		}
 	}
 }
@@ -84,11 +119,7 @@ func runFile(name string) (stdout string, stderr string, scrlog string, err erro
 
 func runScript(name string, scriptRdr io.Reader) (stdout string, stderr string, scrlog string, err error) {
 	engine := script.NewEngine()
-	// engine.ListCmds(os.Stdout, true)
-	// engine.ListConds(os.Stdout, nil)
-	engine.Cmds["execx"] = execExpand("execx", engine.Cmds["exec"])
-	engine.Conds["file"] = fileExists()
-	engine.Conds["env"] = envIsSet()
+	configEngine(engine)
 	var state *script.State
 	state, err = script.NewState(context.Background(), ".", os.Environ())
 	if err != nil {
@@ -102,6 +133,52 @@ func runScript(name string, scriptRdr io.Reader) (stdout string, stderr string, 
 	stdout = state.Stdout()
 	stderr = state.Stderr()
 	return
+}
+
+func runInteractive(name string, scriptRdr io.Reader) (string, error) {
+	engine := script.NewEngine()
+	configEngine(engine)
+	state, err := script.NewState(context.Background(), ".", os.Environ())
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return "", err
+	}
+	var logf bytes.Buffer
+
+	scanner := bufio.NewScanner(scriptRdr)
+	for scanner.Scan() {
+		if scanner.Text() == "stop" {
+			break
+		}
+		reader := bufio.NewReader(strings.NewReader(scanner.Text()))
+		err = engine.Execute(state, name, reader, &logf)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+		} else {
+			stdout := state.Stdout()
+			stderr := state.Stderr()
+			if len(stdout) > 0 {
+				if len(stderr) > 0 {
+					fmt.Println("[stdout]")
+				}
+				fmt.Println(stdout)
+			}
+			if len(stderr) > 0 {
+				if len(stdout) > 0 {
+					fmt.Fprintln(os.Stderr, "[stderr]")
+				}
+				fmt.Fprintln(os.Stderr, stderr)
+			}
+		}
+	}
+
+	return logf.String(), nil
+}
+
+func configEngine(engine *script.Engine) {
+	engine.Cmds["execx"] = execExpand("execx", engine.Cmds["exec"])
+	engine.Conds["file"] = fileExists()
+	engine.Conds["env"] = envIsSet()
 }
 
 func execExpand(name string, execCmd script.Cmd) script.Cmd {
