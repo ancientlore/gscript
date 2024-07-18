@@ -174,7 +174,7 @@ func runInteractive(name string, scriptRdr io.Reader) (string, error) {
 		fmt.Print("> ")
 	}
 
-	return logf.String(), nil
+	return logf.String(), scanner.Err()
 }
 
 func configEngine(engine *script.Engine) {
